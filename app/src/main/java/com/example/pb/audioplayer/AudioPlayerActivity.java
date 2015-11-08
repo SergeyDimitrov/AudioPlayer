@@ -14,18 +14,19 @@ import android.widget.Button;
 import android.widget.TextView;
 
 public class AudioPlayerActivity extends AppCompatActivity {
-    public static final String PLAYING_IS_OVER = "playing_is_over";
 
     private TextView statusView;
     private Button commandButton;
-    private int currState = STATE_IDLE;
     private boolean isBound = false;
+
     private AudioPlayerService serviceLink;
 
     private ServiceConnection connection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
+            isBound = true;
             serviceLink = (AudioPlayerService)((AudioPlayerService.AudioServiceBinder)service).getService();
+            updateUI(serviceLink.getState());
         }
         @Override
         public void onServiceDisconnected(ComponentName name) {
@@ -36,16 +37,15 @@ public class AudioPlayerActivity extends AppCompatActivity {
     private BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            AudioPlayerActivity.this.updateUI(STATE_IDLE);
-            unbindService(connection);
+            AudioPlayerActivity.this.updateUI(serviceLink.getState());
+            if (serviceLink.getState() == AudioPlayerService.STATE_IDLE) {
+                isBound = false;
+                unbindService(connection);
+            }
         }
     };
 
-    private static final String STATE_KEY = "state_key";
     private static final String BOUND_KEY = "bound_key";
-    private static final int STATE_IDLE = 1;
-    private static final int STATE_PLAYING = 2;
-    private static final int STATE_PAUSED = 3;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,18 +55,17 @@ public class AudioPlayerActivity extends AppCompatActivity {
         commandButton = (Button)findViewById(R.id.command_button);
 
         IntentFilter filter = new IntentFilter();
-        filter.addAction(PLAYING_IS_OVER);
+        filter.addAction(AudioPlayerService.STATE_CHANGED);
         registerReceiver(receiver, filter);
 
         if (savedInstanceState != null) {
-            currState = savedInstanceState.getInt(STATE_KEY);
             isBound = savedInstanceState.getBoolean(BOUND_KEY);
         }
 
         if (isBound) {
             bindToService();
         }
-        updateUI(currState);
+        updateUI(AudioPlayerService.STATE_IDLE);
     }
 
     @Override
@@ -80,7 +79,6 @@ public class AudioPlayerActivity extends AppCompatActivity {
     @Override
     protected void onSaveInstanceState(Bundle savedInstanceState) {
         super.onSaveInstanceState(savedInstanceState);
-        savedInstanceState.putInt(STATE_KEY, currState);
         savedInstanceState.putBoolean(BOUND_KEY, isBound);
     }
 
@@ -89,11 +87,10 @@ public class AudioPlayerActivity extends AppCompatActivity {
         bindService(bindIntent, connection, Context.BIND_AUTO_CREATE);
     }
 
-    public void updateUI(int state) {
-        currState = state;
-        switch (state) {
-            case STATE_IDLE:
-                isBound = false;
+
+    private void updateUI(int state) {
+        switch(state) {
+            case AudioPlayerService.STATE_IDLE:
                 statusView.setText(R.string.status_idle);
                 commandButton.setText(R.string.play);
                 commandButton.setOnClickListener(new View.OnClickListener() {
@@ -101,31 +98,26 @@ public class AudioPlayerActivity extends AppCompatActivity {
                     public void onClick(View v) {
                         startService(new Intent(AudioPlayerActivity.this, AudioPlayerService.class));
                         bindToService();
-                        AudioPlayerActivity.this.updateUI(STATE_PLAYING);
                     }
                 });
                 break;
-            case STATE_PLAYING:
-                isBound = true;
+            case AudioPlayerService.STATE_PLAYING:
                 statusView.setText(R.string.status_playing);
                 commandButton.setText(R.string.pause);
                 commandButton.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
                         serviceLink.setPause();
-                        AudioPlayerActivity.this.updateUI(STATE_PAUSED);
                     }
                 });
                 break;
-            case STATE_PAUSED:
+            case AudioPlayerService.STATE_PAUSED:
                 statusView.setText(R.string.status_paused);
                 commandButton.setText(R.string.play);
                 commandButton.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
                         startService(new Intent(AudioPlayerActivity.this, AudioPlayerService.class));
-                        bindToService();
-                        AudioPlayerActivity.this.updateUI(STATE_PLAYING);
                     }
                 });
                 break;

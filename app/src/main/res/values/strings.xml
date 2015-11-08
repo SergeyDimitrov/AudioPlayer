@@ -7,6 +7,9 @@
 
     <string name="play">Play</string>
     <string name="pause">Pause</string>
+    <string name="error">Error</string>
+    <string name="player">Player</string>
+    <string name="audio_name">Howl.wav</string>
 
     <string name="action_settings">Settings</string>
 </resources>
