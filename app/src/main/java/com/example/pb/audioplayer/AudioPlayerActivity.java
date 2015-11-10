@@ -1,5 +1,6 @@
 package com.example.pb.audioplayer;
 
+import android.app.ActivityManager;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -58,14 +59,11 @@ public class AudioPlayerActivity extends AppCompatActivity {
         filter.addAction(AudioPlayerService.STATE_CHANGED);
         registerReceiver(receiver, filter);
 
-        if (savedInstanceState != null) {
-            isBound = savedInstanceState.getBoolean(BOUND_KEY);
-        }
+        isBound = isServiceRunning(AudioPlayerService.class);
 
-        if (isBound) {
-            bindToService();
-        }
         updateUI(AudioPlayerService.STATE_IDLE);
+
+        if (isBound) bindToService();
     }
 
     @Override
@@ -73,7 +71,6 @@ public class AudioPlayerActivity extends AppCompatActivity {
         super.onDestroy();
         unregisterReceiver(receiver);
         if (isBound) unbindService(connection);
-        if (!isChangingConfigurations()) stopService(new Intent(AudioPlayerActivity.this, AudioPlayerService.class));
     }
 
     @Override
@@ -86,7 +83,6 @@ public class AudioPlayerActivity extends AppCompatActivity {
         Intent bindIntent = new Intent(this, AudioPlayerService.class);
         bindService(bindIntent, connection, Context.BIND_AUTO_CREATE);
     }
-
 
     private void updateUI(int state) {
         switch(state) {
@@ -123,4 +119,16 @@ public class AudioPlayerActivity extends AppCompatActivity {
                 break;
         }
     }
+
+    private boolean isServiceRunning(Class serviceClass) {
+        ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+            if (serviceClass.getName().equals(service.service.getClassName())) {
+                return true;
+            }
+        }
+        return false;
+
+    }
+
 }
